@@ -1,13 +1,14 @@
 import os
-import openai
 import requests
+from openai import OpenAI
 
 # Initialize OpenAI API
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_api_key)
 
 # GitHub API details
 GIT_TOKEN = os.getenv("GIT_TOKEN")
-GITHUB_REPOSITORY = os.getenv("GIT_REPO")
+GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 
 def get_latest_pr():
     """Fetch the latest pull request number from the repository."""
@@ -43,13 +44,17 @@ def review_code(file_diffs):
             continue
 
         prompt = f"Review the following code changes in {file_name} and provide suggestions for improvement:\n{patch}"
-        response = openai.Completion.create(
+
+        # Use the new OpenAI API format
+        completion = client.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "system", "content": "You are a code review assistant."},
-                      {"role": "user", "content": prompt}]
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ]
         )
 
-        comments.append(f"**{file_name}:**\n{response['choices'][0]['message']['content']}")
+        comments.append(f"**{file_name}:**\n{completion.choices[0].message['content']}")
     return comments
 
 def post_review(pr_number, comments):
