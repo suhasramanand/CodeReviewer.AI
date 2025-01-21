@@ -43,7 +43,7 @@ def review_code(file_diffs):
             continue
 
         prompt = f"Review the following code changes in {file_name} and provide suggestions for improvement:\n{patch}"
-        response = openai.ChatCompletion.create(
+        response = openai.Completion.create(
             model="gpt-4",
             messages=[{"role": "system", "content": "You are a code review assistant."},
                       {"role": "user", "content": prompt}]
