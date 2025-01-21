@@ -13,6 +13,7 @@ def get_latest_pr():
     """Fetch the latest pull request number from the repository."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
     url = f"https://api.github.com/repos/{GIT_REPO}/pulls?state=open"
+    print(f"Requesting PRs from URL: {url}")  # Add debug log
     response = requests.get(url, headers=headers)
     response.raise_for_status()
 
@@ -22,6 +23,7 @@ def get_latest_pr():
         return prs[0]['number']
     else:
         raise Exception("No open pull requests found.")
+
 
 def get_diff(pr_number):
     """Fetch the pull request diff."""
