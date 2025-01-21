@@ -25,4 +25,3 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
-          GIT_REPO: ${{ secrets.GIT_REPO }}
