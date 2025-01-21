@@ -47,7 +47,7 @@ def review_code(file_diffs):
 
         # Use the new OpenAI API format
         completion = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
