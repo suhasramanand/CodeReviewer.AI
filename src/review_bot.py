@@ -1,12 +1,9 @@
 import os
 import requests
 from groq import Groq
-
-# Initialize Groq API
 groq_api_key = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# GitHub API details
 GIT_TOKEN = os.getenv("GIT_TOKEN")
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 
@@ -18,7 +15,6 @@ def get_latest_pr():
     response = requests.get(url, headers=headers)
     response.raise_for_status()
 
-    # If there are open PRs, get the first one
     prs = response.json()
     if prs:
         return prs[0]['number']
@@ -42,12 +38,24 @@ def review_code(file_diffs):
         if not patch:
             continue
 
-        prompt = f"Review the following code changes in {file_name} and provide suggestions for improvement:\n{patch}"
+        prompt = (
+            f"Review the following code changes in the file '{file_name}':\n\n"
+            f"{patch}\n\n"
+            f"### Perform the following tasks:\n"
+            f"1. Analyze the **time complexity** and **space complexity** of the functions or logic in the code.\n"
+            f"2. Identify any **potential vulnerabilities**, such as:\n"
+            f"   - Unvalidated input\n"
+            f"   - API abuse risks\n"
+            f"   - Hardcoded sensitive information\n"
+            f"   - Improper error handling\n"
+            f"3. Suggest improvements to **optimize performance** and **enhance security**.\n"
+            f"4. Provide general feedback on code quality, readability, and maintainability."
+        )
 
-        # Use Groq API for code review (LLaMA model)
+
         chat_completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "You are a professional code reviewer with expertise in performance optimization and secure coding practices."},
                 {"role": "user", "content": prompt}
             ],
             model="llama-3.3-70b-versatile"
@@ -66,14 +74,10 @@ def post_review(pr_number, comments):
         response.raise_for_status()
 
 if __name__ == "__main__":
-    # Automatically fetch the latest PR number
     pr_number = get_latest_pr()
     
-    # Fetch the diff for the latest PR
     diffs = get_diff(pr_number)
     
-    # Review the code
     review_comments = review_code(diffs)
     
-    # Post the review comments back to the PR
     post_review(pr_number, review_comments)
