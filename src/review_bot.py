@@ -28,7 +28,7 @@ def get_latest_pr():
 def get_diff(pr_number):
     """Fetch the pull request diff."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    url = f"https://api.github.com/repos/{GIT_REPO}/pulls/{pr_number}/files"
+    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/pulls/{pr_number}/files"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response.json()
@@ -55,7 +55,7 @@ def review_code(file_diffs):
 def post_review(pr_number, comments):
     """Post comments back to the pull request."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    url = f"https://api.github.com/repos/{GIT_REPO}/issues/{pr_number}/comments"
+    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/issues/{pr_number}/comments"
     for comment in comments:
         payload = {"body": comment}
         response = requests.post(url, headers=headers, json=payload)
