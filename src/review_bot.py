@@ -4,7 +4,7 @@ from groq import Groq
 
 # Initialize Groq API
 groq_api_key = os.getenv("GROQ_API_KEY")
-client = Groq(api_key=groq_api_key)
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # GitHub API details
 GIT_TOKEN = os.getenv("GIT_TOKEN")

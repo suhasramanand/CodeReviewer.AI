@@ -23,5 +23,5 @@ jobs:
       - name: Run Code Reviewer Bot
         run: python src/review_bot.py
         env:
-          LLAMA_API_KEY: ${{ secrets.LLAMA_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
