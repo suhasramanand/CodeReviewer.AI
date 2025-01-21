@@ -1,3 +1,4 @@
+![Logo](logo.png)
 # CodeReviewer.AI
 
 CodeReviewer.AI is an automated pull request review bot that leverages artificial intelligence to analyze and provide suggestions on code changes. It uses Groq's language model to review and suggest improvements for the code in open pull requests, allowing developers to get feedback on their code changes without manual review.
