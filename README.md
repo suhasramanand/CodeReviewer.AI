@@ -25,7 +25,7 @@ You will need the following dependencies:
 Install the dependencies by running:
 
 ```bash
-pip install -r requirements.txtp 
+pip install -r requirements.txt
 ```
 
 ## Setup
