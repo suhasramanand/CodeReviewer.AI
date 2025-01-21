@@ -7,7 +7,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # GitHub API details
 GIT_TOKEN = os.getenv("GIT_TOKEN")
-GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
+GITHUB_REPOSITORY = os.getenv("GIT_REPO")
 
 def get_latest_pr():
     """Fetch the latest pull request number from the repository."""
