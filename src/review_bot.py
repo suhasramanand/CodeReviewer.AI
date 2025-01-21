@@ -6,13 +6,13 @@ import requests
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # GitHub API details
-GITHUB_TOKEN = os.getenv("GIT_TOKEN")
+GIT_TOKEN = os.getenv("GIT_TOKEN")
 GITHUB_REPO = os.getenv("GITHUB_REPOSITORY")
 
 def get_latest_pr():
     """Fetch the latest pull request number from the repository."""
-    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/pulls?state=open"
+    headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
+    url = f"https://api.github.com/repos/{GIT_TOKEN}/pulls?state=open"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
 
@@ -25,7 +25,7 @@ def get_latest_pr():
 
 def get_diff(pr_number):
     """Fetch the pull request diff."""
-    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
     url = f"https://api.github.com/repos/{GITHUB_REPO}/pulls/{pr_number}/files"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
@@ -52,7 +52,7 @@ def review_code(file_diffs):
 
 def post_review(pr_number, comments):
     """Post comments back to the pull request."""
-    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
     url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{pr_number}/comments"
     for comment in comments:
         payload = {"body": comment}
