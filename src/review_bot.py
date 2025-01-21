@@ -7,12 +7,12 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # GitHub API details
 GIT_TOKEN = os.getenv("GIT_TOKEN")
-GIT_REPO = os.getenv("GITHUB_REPOSITORY")
+GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 
 def get_latest_pr():
     """Fetch the latest pull request number from the repository."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    url = f"https://api.github.com/repos/{GIT_REPO}/pulls?state=open"
+    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/pulls?state=open"
     print(f"Requesting PRs from URL: {url}")  # Add debug log
     response = requests.get(url, headers=headers)
     response.raise_for_status()
