@@ -1,10 +1,10 @@
 import os
 import requests
-from openai import OpenAI
+from groq import Groq
 
-# Initialize OpenAI API
-openai_api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=openai_api_key)
+# Initialize Groq API
+groq_api_key = os.getenv("GROQ_API_KEY")
+client = Groq(api_key=groq_api_key)
 
 # GitHub API details
 GIT_TOKEN = os.getenv("GIT_TOKEN")
@@ -25,7 +25,6 @@ def get_latest_pr():
     else:
         raise Exception("No open pull requests found.")
 
-
 def get_diff(pr_number):
     """Fetch the pull request diff."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
@@ -35,7 +34,7 @@ def get_diff(pr_number):
     return response.json()
 
 def review_code(file_diffs):
-    """Analyze code changes using OpenAI."""
+    """Analyze code changes using Groq's LLaMA model."""
     comments = []
     for file in file_diffs:
         file_name = file["filename"]
@@ -45,16 +44,16 @@ def review_code(file_diffs):
 
         prompt = f"Review the following code changes in {file_name} and provide suggestions for improvement:\n{patch}"
 
-        # Use the new OpenAI API format
-        completion = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        # Use Groq API for code review (LLaMA model)
+        chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            model="llama-3.3-70b-versatile"
         )
 
-        comments.append(f"**{file_name}:**\n{completion.choices[0].message['content']}")
+        comments.append(f"**{file_name}:**\n{chat_completion.choices[0].message.content}")
     return comments
 
 def post_review(pr_number, comments):
