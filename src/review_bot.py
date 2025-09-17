@@ -54,8 +54,10 @@ SECURITY_PATTERNS = {
 def get_latest_pr():
     """Fetch the latest pull request number from the repository."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    url = f"https://api.github.com/repos/suhasramanand/CodeReviewer.AI/pulls?state=open"
-    print(f"🔍 Checking for open PRs...")
+    # Use GITHUB_REPOSITORY environment variable if available, otherwise fallback to hardcoded value
+    repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
+    url = f"https://api.github.com/repos/{repo}/pulls?state=open"
+    print(f"🔍 Checking for open PRs in {repo}...")
     response = requests.get(url, headers=headers)
     response.raise_for_status()
 
@@ -69,7 +71,9 @@ def get_latest_pr():
 def get_diff(pr_number):
     """Fetch the pull request diff."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    url = f"https://api.github.com/repos/suhasramanand/CodeReviewer.AI/pulls/{pr_number}/files"
+    # Use GITHUB_REPOSITORY environment variable if available, otherwise fallback to hardcoded value
+    repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
+    url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/files"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response.json()
@@ -243,7 +247,9 @@ def review_code(file_diffs):
 def post_review(pr_number, comments):
     """Post security-focused comments back to the pull request."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    url = f"https://api.github.com/repos/suhasramanand/CodeReviewer.AI/issues/{pr_number}/comments"
+    # Use GITHUB_REPOSITORY environment variable if available, otherwise fallback to hardcoded value
+    repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
+    url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
     
     for comment in comments:
         payload = {"body": comment}
