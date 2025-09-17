@@ -298,80 +298,78 @@ def extract_dependencies_from_diff(patch: str) -> List[str]:
     return dependencies
 
 def generate_human_review(file_name: str, patch: str, issues: List[Dict], cve_vulns: List[Dict]) -> str:
-    """Generate human-like, concise code review using AI."""
+    """Generate human-like, concise code review with checklist format."""
     
-    # Count issues by severity and category
-    high_issues = [i for i in issues if i['severity'] == 'HIGH']
-    medium_issues = [i for i in issues if i['severity'] == 'MEDIUM']
-    low_issues = [i for i in issues if i['severity'] == 'LOW']
-    
-    # Group by category
+    # Group issues by category
     security_issues = [i for i in issues if i['category'] == 'security']
     quality_issues = [i for i in issues if i['category'] == 'code_quality']
     performance_issues = [i for i in issues if i['category'] == 'performance']
     best_practice_issues = [i for i in issues if i['category'] == 'best_practices']
     
-    # Create issue summary
-    issue_summary = ""
-    if high_issues:
-        issue_summary += f"🚨 **{len(high_issues)} critical issues**\n"
-    if medium_issues:
-        issue_summary += f"⚠️ **{len(medium_issues)} issues**\n"
-    if low_issues:
-        issue_summary += f"💡 **{len(low_issues)} suggestions**\n"
-    if cve_vulns:
-        issue_summary += f"🔍 **{len(cve_vulns)} CVEs in dependencies**\n"
+    # Create checklist
+    checklist = []
     
+    # Security checks
+    if not security_issues:
+        checklist.append("✅ Security - No vulnerabilities found")
+    else:
+        critical_security = [i for i in security_issues if i['severity'] == 'HIGH']
+        if critical_security:
+            checklist.append(f"❌ Security - {len(critical_security)} critical issues")
+        else:
+            checklist.append(f"⚠️ Security - {len(security_issues)} issues")
+    
+    # Code quality checks
+    if not quality_issues:
+        checklist.append("✅ Code Quality - Clean code")
+    else:
+        checklist.append(f"⚠️ Code Quality - {len(quality_issues)} issues")
+    
+    # Performance checks
+    if not performance_issues:
+        checklist.append("✅ Performance - No bottlenecks")
+    else:
+        checklist.append(f"⚠️ Performance - {len(performance_issues)} issues")
+    
+    # Best practices checks
+    if not best_practice_issues:
+        checklist.append("✅ Best Practices - Following standards")
+    else:
+        checklist.append(f"💡 Best Practices - {len(best_practice_issues)} suggestions")
+    
+    # CVE checks
+    if not cve_vulns:
+        checklist.append("✅ Dependencies - No known CVEs")
+    else:
+        checklist.append(f"🔍 Dependencies - {len(cve_vulns)} CVEs found")
+    
+    # Generate overall status
+    critical_issues = [i for i in issues if i['severity'] == 'HIGH']
     if not issues and not cve_vulns:
-        issue_summary = "✅ **All good**\n"
+        overall_status = "All checks passed! 🎉"
+    elif critical_issues:
+        overall_status = f"Critical issues found - {len(critical_issues)} need immediate attention"
+    elif issues:
+        overall_status = f"Some issues found - {len(issues)} items to review"
+    else:
+        overall_status = "Minor suggestions only"
     
-    # Create detailed issue list (top 3 most critical)
+    # Create the review content
+    checklist_text = "\n".join(checklist)
+    
+    # Add specific issue details if there are critical issues
     issue_details = ""
-    for issue in sorted(issues, key=lambda x: ['HIGH', 'MEDIUM', 'LOW'].index(x['severity']))[:3]:
-        category_emoji = {'security': '🛡️', 'code_quality': '📝', 'performance': '⚡', 'best_practices': '✨'}
-        emoji = category_emoji.get(issue['category'], '📋')
-        issue_details += f"• {emoji} **Line {issue['line']}**: {issue['type'].replace('_', ' ').title()}\n"
+    if critical_issues:
+        issue_details = "\n\n**Critical Issues:**\n"
+        for issue in critical_issues[:3]:  # Top 3 critical issues
+            issue_details += f"• Line {issue['line']}: {issue['type'].replace('_', ' ').title()}\n"
     
-    for cve in cve_vulns[:2]:  # Limit to top 2 CVEs
-        issue_details += f"• 🔍 **{cve['package']}**: {cve['cve']}\n"
+    if cve_vulns:
+        issue_details += "\n**CVEs:**\n"
+        for cve in cve_vulns[:2]:  # Top 2 CVEs
+            issue_details += f"• {cve['package']}: {cve['cve']}\n"
     
-    prompt = f"""You are a senior engineer reviewing PRs. Be EXTREMELY concise and human-like.
-
-File: {file_name}
-Code changes:
-{patch[:800]}...
-
-Review results:
-{issue_summary}
-{issue_details}
-
-Provide a VERY brief review:
-- If no issues: Just say "Looks good" or "All clear" (2-3 words max)
-- If issues: Mention only the most critical issue in 1-2 lines max
-- Be conversational, not formal
-- Focus on what matters most
-
-Examples:
-- "Looks good 👍"
-- "All clear"
-- "SQL injection on line 15 - use params"
-- "Missing error handling"
-- "Performance issue - N+1 query" """
-
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a senior engineer. Be EXTREMELY brief. If no issues, just say 'Looks good'. If issues, mention only the most critical problem in 1-2 lines."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            max_tokens=80,
-            temperature=0.3
-        )
-        
-        return chat_completion.choices[0].message.content.strip()
-    except Exception as e:
-        return f"🔧 Review completed. {issue_summary}{issue_details}"
+    return f"{overall_status}\n\n{checklist_text}{issue_details}"
 
 def review_code(file_diffs):
     """Analyze code changes with comprehensive engineering review."""
@@ -409,11 +407,11 @@ def review_code(file_diffs):
         
         # Format comment with status badge
         if not issues and not cve_vulnerabilities:
-            status = "✅ GOOD"
+            status = "✅ ALL CHECKS PASSED"
         elif any(i['severity'] == 'HIGH' for i in issues):
-            status = "🚨 CRITICAL"
+            status = "🚨 CRITICAL ISSUES"
         elif any(i['severity'] == 'MEDIUM' for i in issues):
-            status = "⚠️ ISSUES"
+            status = "⚠️ ISSUES FOUND"
         else:
             status = "💡 SUGGESTIONS"
             
