@@ -83,8 +83,8 @@ def get_latest_pr():
     else:
         raise Exception("No open pull requests found.")
 
-def get_diff(pr_number):
-    """Fetch the pull request diff."""
+def get_diff_from_github_api(pr_number):
+    """Fetch the pull request diff using GitHub API."""
     headers = {
         "Authorization": f"Bearer {GIT_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
@@ -107,6 +107,61 @@ def get_diff(pr_number):
     
     response.raise_for_status()
     return response.json()
+
+def get_diff_from_git():
+    """Get diff using git command instead of GitHub API."""
+    try:
+        print("📁 Getting diff using git command...")
+        # Get the diff between the current branch and the base branch
+        result = subprocess.run(['git', 'diff', 'origin/main', 'HEAD'], 
+                              capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            diff_content = result.stdout
+            print(f"✅ Got diff content ({len(diff_content)} characters)")
+            
+            # Parse the diff into a format similar to GitHub API response
+            files = []
+            current_file = None
+            
+            for line in diff_content.split('\n'):
+                if line.startswith('diff --git'):
+                    if current_file:
+                        files.append(current_file)
+                    # Extract filename from diff header
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        filename = parts[3][2:]  # Remove 'b/' prefix
+                        current_file = {
+                            "filename": filename,
+                            "patch": ""
+                        }
+                elif current_file and line.startswith(('+', '-', ' ')):
+                    current_file["patch"] += line + "\n"
+            
+            if current_file:
+                files.append(current_file)
+            
+            print(f"📋 Parsed {len(files)} files from git diff")
+            return files
+        else:
+            print(f"❌ Git diff failed: {result.stderr}")
+            return []
+            
+    except Exception as e:
+        print(f"❌ Error getting git diff: {e}")
+        return []
+
+def get_diff(pr_number):
+    """Get diff using git command first, fallback to GitHub API."""
+    # Try git command first (no authentication needed)
+    files = get_diff_from_git()
+    
+    if files:
+        return files
+    
+    print("🔄 Git diff failed, trying GitHub API...")
+    return get_diff_from_github_api(pr_number)
 
 def check_cve_vulnerabilities(dependencies: List[str]) -> List[Dict]:
     """Check for known CVEs in dependencies using safety."""
