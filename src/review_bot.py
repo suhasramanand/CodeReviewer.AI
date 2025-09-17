@@ -514,46 +514,35 @@ def review_code(file_diffs):
     return review_data
 
 def post_review(pr_number, review_data):
-    """Post line-specific review comments and summary."""
+    """Post review comments and summary."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
     repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
     
-    # Post line-specific comments
-    if review_data['line_comments']:
-        url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
-        
-        # Group comments by file
-        comments_by_file = {}
-        for comment in review_data['line_comments']:
-            file_path = comment['path']
-            if file_path not in comments_by_file:
-                comments_by_file[file_path] = []
-            comments_by_file[file_path].append({
-                'path': comment['path'],
-                'line': comment['line'],
-                'body': comment['body'],
-                'side': comment['side']
-            })
-        
-        # Create review for each file
-        for file_path, comments in comments_by_file.items():
-            payload = {
-                'body': f"## Code Review - {file_path}\n\nFound {len(comments)} issues that need attention:",
-                'event': 'REQUEST_CHANGES' if review_data['critical_issues_found'] else 'COMMENT',
-                'comments': comments
-            }
-            
-            response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            print(f"✅ Posted line-specific review for {file_path}")
-    
-    # Post summary comment
-    if review_data['summary_comment']:
+    # For now, just post a general comment instead of line-specific reviews
+    # This avoids the 422 error while we debug the line number mapping
+    if review_data['line_comments'] or review_data['summary_comment']:
         url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
-        payload = {"body": review_data['summary_comment']}
+        
+        # Create a general review comment
+        comment_body = "## 🔍 Code Review Results\n\n"
+        
+        if review_data['critical_issues_found']:
+            comment_body += "🚨 **CRITICAL ISSUES FOUND** - This PR needs attention before merging!\n\n"
+        else:
+            comment_body += "✅ **No critical issues found** - This PR looks good!\n\n"
+        
+        if review_data['line_comments']:
+            comment_body += f"**Found {len(review_data['line_comments'])} issues:**\n\n"
+            for comment in review_data['line_comments'][:5]:  # Limit to first 5 issues
+                comment_body += f"• **{comment['path']}:{comment['line']}** - {comment['body']}\n\n"
+        
+        if review_data['summary_comment']:
+            comment_body += f"**Summary:** {review_data['summary_comment']}\n\n"
+        
+        payload = {"body": comment_body}
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
-        print(f"✅ Posted summary comment")
+        print(f"✅ Posted review comment")
 
 if __name__ == "__main__":
     try:
