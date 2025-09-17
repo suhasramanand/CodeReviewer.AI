@@ -85,11 +85,26 @@ def get_latest_pr():
 
 def get_diff(pr_number):
     """Fetch the pull request diff."""
-    headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {GIT_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "CodeReviewer.AI-Bot"
+    }
     # Use GITHUB_REPOSITORY environment variable if available, otherwise fallback to hardcoded value
     repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
     url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/files"
+    print(f"📁 Fetching diff for PR #{pr_number}...")
+    
     response = requests.get(url, headers=headers)
+    print(f"📡 Response status: {response.status_code}")
+    
+    if response.status_code == 401:
+        print("❌ Authentication failed when fetching diff. Please check:")
+        print("   1. GIT_TOKEN secret is set correctly")
+        print("   2. Token has 'repo' permissions")
+        print("   3. Token is not expired")
+        response.raise_for_status()
+    
     response.raise_for_status()
     return response.json()
 
