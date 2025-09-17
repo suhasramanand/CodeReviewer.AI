@@ -26,7 +26,6 @@ You will need the following dependencies:
 - `pygments`: For code syntax highlighting.
 - `safety`: For CVE vulnerability scanning of Python dependencies.
 - `bandit`: For static security analysis (optional).
-- `cve-search-api`: For additional CVE database access.
 
 Install the dependencies by running:
 
