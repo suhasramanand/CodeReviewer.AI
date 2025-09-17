@@ -452,7 +452,7 @@ def review_code(file_diffs):
         
         # Parse patch to get line numbers and content
         file_lines = patch.split('\n')
-        line_mapping = {}  # Maps line number in diff to actual line number
+        added_lines = []  # Store added lines with their actual line numbers
         current_line = 0
         
         for line in file_lines:
@@ -464,7 +464,10 @@ def review_code(file_diffs):
                     new_range = parts[2].split(',')
                     current_line = int(new_range[0][1:])  # Remove '+' prefix
             elif line.startswith('+') and not line.startswith('+++'):
-                line_mapping[current_line] = line[1:]  # Store added line content
+                added_lines.append({
+                    'line_number': current_line,
+                    'content': line[1:]  # Remove '+' prefix
+                })
                 current_line += 1
             elif line.startswith('-'):
                 # Skip deleted lines
@@ -474,7 +477,7 @@ def review_code(file_diffs):
                 current_line += 1
         
         # Extract added code for analysis
-        added_code = '\n'.join(line_mapping.values())
+        added_code = '\n'.join([line['content'] for line in added_lines])
         
         # Comprehensive code analysis
         issues = scan_for_code_issues(added_code, file_name)
@@ -492,11 +495,12 @@ def review_code(file_diffs):
                 review_data['critical_issues_found'] = True
             
             # Find the actual line number in the diff
-            issue_line = issue['line']
-            if issue_line in line_mapping:
+            issue_line_in_code = issue['line']  # Line number within the added code
+            if issue_line_in_code <= len(added_lines):
+                actual_line_number = added_lines[issue_line_in_code - 1]['line_number']
                 line_comment = {
                     'path': file_name,
-                    'line': issue_line,
+                    'line': actual_line_number,
                     'body': generate_line_comment(issue),
                     'side': 'RIGHT'  # Comment on the new version
                 }
