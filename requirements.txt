@@ -3,4 +3,3 @@ pygments
 groq
 safety
 bandit
-cve-search-api
