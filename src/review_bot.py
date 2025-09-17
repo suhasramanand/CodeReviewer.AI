@@ -12,43 +12,99 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 GIT_TOKEN = os.getenv("GIT_TOKEN")
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 
-# Security patterns to detect vulnerabilities
-SECURITY_PATTERNS = {
-    'sql_injection': [
-        r'execute\s*\(\s*["\'].*%s.*["\']',
-        r'cursor\.execute\s*\(\s*f["\'].*\{.*\}.*["\']',
-        r'query\s*=\s*["\'].*\+.*["\']'
-    ],
-    'xss': [
-        r'innerHTML\s*=',
-        r'document\.write\s*\(',
-        r'eval\s*\(',
-        r'setTimeout\s*\(\s*["\']'
-    ],
-    'path_traversal': [
-        r'\.\./',
-        r'\.\.\\\\',
-        r'open\s*\(\s*["\'].*\+.*["\']',
-        r'file\s*=\s*["\'].*\+.*["\']'
-    ],
-    'hardcoded_secrets': [
-        r'password\s*=\s*["\'][^"\']+["\']',
-        r'api_key\s*=\s*["\'][^"\']+["\']',
-        r'secret\s*=\s*["\'][^"\']+["\']',
-        r'token\s*=\s*["\'][^"\']+["\']'
-    ],
-    'unsafe_deserialization': [
-        r'pickle\.loads\s*\(',
-        r'yaml\.load\s*\(',
-        r'json\.loads\s*\(\s*request\.',
-        r'eval\s*\('
-    ],
-    'command_injection': [
-        r'os\.system\s*\(',
-        r'subprocess\.call\s*\(',
-        r'os\.popen\s*\(',
-        r'shell\s*=\s*True'
-    ]
+# Code quality and security patterns to detect issues
+CODE_PATTERNS = {
+    'security': {
+        'sql_injection': [
+            r'execute\s*\(\s*["\'].*%s.*["\']',
+            r'cursor\.execute\s*\(\s*f["\'].*\{.*\}.*["\']',
+            r'query\s*=\s*["\'].*\+.*["\']'
+        ],
+        'xss': [
+            r'innerHTML\s*=',
+            r'document\.write\s*\(',
+            r'eval\s*\(',
+            r'setTimeout\s*\(\s*["\']'
+        ],
+        'path_traversal': [
+            r'\.\./',
+            r'\.\.\\\\',
+            r'open\s*\(\s*["\'].*\+.*["\']',
+            r'file\s*=\s*["\'].*\+.*["\']'
+        ],
+        'hardcoded_secrets': [
+            r'password\s*=\s*["\'][^"\']+["\']',
+            r'api_key\s*=\s*["\'][^"\']+["\']',
+            r'secret\s*=\s*["\'][^"\']+["\']',
+            r'token\s*=\s*["\'][^"\']+["\']'
+        ],
+        'unsafe_deserialization': [
+            r'pickle\.loads\s*\(',
+            r'yaml\.load\s*\(',
+            r'json\.loads\s*\(\s*request\.',
+            r'eval\s*\('
+        ],
+        'command_injection': [
+            r'os\.system\s*\(',
+            r'subprocess\.call\s*\(',
+            r'os\.popen\s*\(',
+            r'shell\s*=\s*True'
+        ]
+    },
+    'code_quality': {
+        'long_functions': [
+            r'def\s+\w+\([^)]*\):\s*$'
+        ],
+        'magic_numbers': [
+            r'\b\d{3,}\b'
+        ],
+        'todo_comments': [
+            r'#\s*(TODO|FIXME|HACK|XXX)',
+            r'//\s*(TODO|FIXME|HACK|XXX)'
+        ],
+        'print_statements': [
+            r'print\s*\(',
+            r'console\.log\s*\('
+        ],
+        'empty_catches': [
+            r'except\s*:.*pass',
+            r'catch\s*\([^)]*\)\s*\{\s*\}'
+        ],
+        'duplicate_code': [
+            r'copy.*paste',
+            r'duplicate'
+        ]
+    },
+    'performance': {
+        'n_plus_one': [
+            r'for\s+\w+\s+in\s+\w+:\s*\n.*\.query\(',
+            r'for\s+\w+\s+in\s+\w+:\s*\n.*\.get\('
+        ],
+        'inefficient_loops': [
+            r'for\s+\w+\s+in\s+range\(len\(',
+            r'\.append\(.*\)\s*in\s+loop'
+        ],
+        'memory_leaks': [
+            r'global\s+\w+',
+            r'static\s+\w+'
+        ]
+    },
+    'best_practices': {
+        'missing_error_handling': [
+            r'def\s+\w+\([^)]*\):\s*\n(?!.*try)',
+            r'function\s+\w+\([^)]*\)\s*\{\s*(?!.*try)'
+        ],
+        'hardcoded_values': [
+            r'localhost',
+            r'127\.0\.0\.1',
+            r'http://',
+            r'https://'
+        ],
+        'missing_validation': [
+            r'def\s+\w+\([^)]*\):\s*\n(?!.*if.*is.*None)',
+            r'function\s+\w+\([^)]*\)\s*\{\s*(?!.*if.*===.*null)'
+        ]
+    }
 }
 
 def get_latest_pr():
@@ -198,24 +254,37 @@ def check_cve_vulnerabilities(dependencies: List[str]) -> List[Dict]:
     
     return vulnerabilities
 
-def scan_for_security_vulnerabilities(code_content: str, file_name: str) -> List[Dict]:
-    """Scan code for security vulnerabilities using pattern matching."""
-    vulnerabilities = []
+def scan_for_code_issues(code_content: str, file_name: str) -> List[Dict]:
+    """Scan code for security, quality, performance, and best practice issues."""
+    issues = []
     
-    for vuln_type, patterns in SECURITY_PATTERNS.items():
-        for pattern in patterns:
-            matches = re.finditer(pattern, code_content, re.IGNORECASE | re.MULTILINE)
-            for match in matches:
-                line_num = code_content[:match.start()].count('\n') + 1
-                vulnerabilities.append({
-                    'type': vuln_type,
-                    'line': line_num,
-                    'code': match.group(0).strip(),
-                    'severity': 'HIGH' if vuln_type in ['sql_injection', 'command_injection', 'unsafe_deserialization'] else 'MEDIUM',
-                    'file': file_name
-                })
+    for category, patterns in CODE_PATTERNS.items():
+        for issue_type, pattern_list in patterns.items():
+            for pattern in pattern_list:
+                matches = re.finditer(pattern, code_content, re.IGNORECASE | re.MULTILINE)
+                for match in matches:
+                    line_num = code_content[:match.start()].count('\n') + 1
+                    
+                    # Determine severity based on category and type
+                    if category == 'security':
+                        severity = 'HIGH' if issue_type in ['sql_injection', 'command_injection', 'unsafe_deserialization'] else 'MEDIUM'
+                    elif category == 'performance':
+                        severity = 'MEDIUM'
+                    elif category == 'code_quality':
+                        severity = 'LOW' if issue_type in ['todo_comments', 'print_statements'] else 'MEDIUM'
+                    else:  # best_practices
+                        severity = 'LOW'
+                    
+                    issues.append({
+                        'category': category,
+                        'type': issue_type,
+                        'line': line_num,
+                        'code': match.group(0).strip(),
+                        'severity': severity,
+                        'file': file_name
+                    })
     
-    return vulnerabilities
+    return issues
 
 def extract_dependencies_from_diff(patch: str) -> List[str]:
     """Extract dependencies from requirements.txt changes."""
@@ -228,67 +297,84 @@ def extract_dependencies_from_diff(patch: str) -> List[str]:
                 dependencies.append(dep_line)
     return dependencies
 
-def generate_human_review(file_name: str, patch: str, vulnerabilities: List[Dict], cve_vulns: List[Dict]) -> str:
-    """Generate human-like, concise security review using AI."""
+def generate_human_review(file_name: str, patch: str, issues: List[Dict], cve_vulns: List[Dict]) -> str:
+    """Generate human-like, concise code review using AI."""
     
-    # Count vulnerabilities by severity
-    high_vulns = [v for v in vulnerabilities if v['severity'] == 'HIGH']
-    medium_vulns = [v for v in vulnerabilities if v['severity'] == 'MEDIUM']
+    # Count issues by severity and category
+    high_issues = [i for i in issues if i['severity'] == 'HIGH']
+    medium_issues = [i for i in issues if i['severity'] == 'MEDIUM']
+    low_issues = [i for i in issues if i['severity'] == 'LOW']
     
-    # Create vulnerability summary
-    vuln_summary = ""
-    if high_vulns:
-        vuln_summary += f"🚨 **{len(high_vulns)} HIGH severity issues found**\n"
-    if medium_vulns:
-        vuln_summary += f"⚠️ **{len(medium_vulns)} MEDIUM severity issues found**\n"
+    # Group by category
+    security_issues = [i for i in issues if i['category'] == 'security']
+    quality_issues = [i for i in issues if i['category'] == 'code_quality']
+    performance_issues = [i for i in issues if i['category'] == 'performance']
+    best_practice_issues = [i for i in issues if i['category'] == 'best_practices']
+    
+    # Create issue summary
+    issue_summary = ""
+    if high_issues:
+        issue_summary += f"🚨 **{len(high_issues)} critical issues**\n"
+    if medium_issues:
+        issue_summary += f"⚠️ **{len(medium_issues)} issues**\n"
+    if low_issues:
+        issue_summary += f"💡 **{len(low_issues)} suggestions**\n"
     if cve_vulns:
-        vuln_summary += f"🔍 **{len(cve_vulns)} known CVEs in dependencies**\n"
+        issue_summary += f"🔍 **{len(cve_vulns)} CVEs in dependencies**\n"
     
-    if not vulnerabilities and not cve_vulns:
-        vuln_summary = "✅ **No obvious security issues detected**\n"
+    if not issues and not cve_vulns:
+        issue_summary = "✅ **All good**\n"
     
-    # Create detailed vulnerability list
-    vuln_details = ""
-    for vuln in vulnerabilities[:5]:  # Limit to top 5 for conciseness
-        vuln_details += f"• **Line {vuln['line']}**: {vuln['type'].replace('_', ' ').title()} - `{vuln['code'][:50]}...`\n"
+    # Create detailed issue list (top 3 most critical)
+    issue_details = ""
+    for issue in sorted(issues, key=lambda x: ['HIGH', 'MEDIUM', 'LOW'].index(x['severity']))[:3]:
+        category_emoji = {'security': '🛡️', 'code_quality': '📝', 'performance': '⚡', 'best_practices': '✨'}
+        emoji = category_emoji.get(issue['category'], '📋')
+        issue_details += f"• {emoji} **Line {issue['line']}**: {issue['type'].replace('_', ' ').title()}\n"
     
-    for cve in cve_vulns[:3]:  # Limit to top 3 CVEs
-        vuln_details += f"• **{cve['package']} {cve['version']}**: {cve['cve']} ({cve['severity']})\n"
+    for cve in cve_vulns[:2]:  # Limit to top 2 CVEs
+        issue_details += f"• 🔍 **{cve['package']}**: {cve['cve']}\n"
     
-    prompt = f"""You are a senior security engineer reviewing code changes. Be concise, human-like, and focus on security.
+    prompt = f"""You are a senior engineer reviewing PRs. Be EXTREMELY concise and human-like.
 
 File: {file_name}
 Code changes:
-{patch[:2000]}...
+{patch[:800]}...
 
-Security scan results:
-{vuln_summary}
-{vuln_details}
+Review results:
+{issue_summary}
+{issue_details}
 
-Provide a brief, actionable security review (max 3-4 sentences). Focus on:
-1. Critical security issues that need immediate attention
-2. Specific fixes for vulnerabilities found
-3. Best practices to implement
+Provide a VERY brief review:
+- If no issues: Just say "Looks good" or "All clear" (2-3 words max)
+- If issues: Mention only the most critical issue in 1-2 lines max
+- Be conversational, not formal
+- Focus on what matters most
 
-Be conversational but professional. Use emojis sparingly. Prioritize actionable feedback over general advice."""
+Examples:
+- "Looks good 👍"
+- "All clear"
+- "SQL injection on line 15 - use params"
+- "Missing error handling"
+- "Performance issue - N+1 query" """
 
     try:
         chat_completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a senior security engineer. Provide concise, actionable security feedback. Be human-like and direct."},
+                {"role": "system", "content": "You are a senior engineer. Be EXTREMELY brief. If no issues, just say 'Looks good'. If issues, mention only the most critical problem in 1-2 lines."},
                 {"role": "user", "content": prompt}
             ],
             model="llama-3.3-70b-versatile",
-            max_tokens=300,
+            max_tokens=80,
             temperature=0.3
         )
         
         return chat_completion.choices[0].message.content.strip()
     except Exception as e:
-        return f"🔧 Security scan completed. {vuln_summary}{vuln_details}"
+        return f"🔧 Review completed. {issue_summary}{issue_details}"
 
 def review_code(file_diffs):
-    """Analyze code changes with enhanced security focus."""
+    """Analyze code changes with comprehensive engineering review."""
     comments = []
     
     for file in file_diffs:
@@ -298,7 +384,7 @@ def review_code(file_diffs):
         if not patch:
             continue
             
-        print(f"🔍 Analyzing {file_name} for security issues...")
+        print(f"🔍 Reviewing {file_name}...")
         
         # Extract added code for analysis
         added_lines = []
@@ -308,8 +394,8 @@ def review_code(file_diffs):
         
         added_code = '\n'.join(added_lines)
         
-        # Security vulnerability scanning
-        vulnerabilities = scan_for_security_vulnerabilities(added_code, file_name)
+        # Comprehensive code analysis
+        issues = scan_for_code_issues(added_code, file_name)
         
         # CVE checking for dependencies
         cve_vulnerabilities = []
@@ -319,11 +405,19 @@ def review_code(file_diffs):
                 cve_vulnerabilities = check_cve_vulnerabilities(dependencies)
         
         # Generate human-like review
-        review = generate_human_review(file_name, patch, vulnerabilities, cve_vulnerabilities)
+        review = generate_human_review(file_name, patch, issues, cve_vulnerabilities)
         
-        # Format comment with security badge
-        security_status = "🛡️ SECURE" if not vulnerabilities and not cve_vulnerabilities else "⚠️ SECURITY ISSUES"
-        comment = f"## {security_status} - {file_name}\n\n{review}"
+        # Format comment with status badge
+        if not issues and not cve_vulnerabilities:
+            status = "✅ GOOD"
+        elif any(i['severity'] == 'HIGH' for i in issues):
+            status = "🚨 CRITICAL"
+        elif any(i['severity'] == 'MEDIUM' for i in issues):
+            status = "⚠️ ISSUES"
+        else:
+            status = "💡 SUGGESTIONS"
+            
+        comment = f"## {status} - {file_name}\n\n{review}"
         
         comments.append(comment)
     
@@ -344,7 +438,7 @@ def post_review(pr_number, comments):
 
 if __name__ == "__main__":
     try:
-        print("🛡️ Starting Security Code Review Bot...")
+        print("👨‍💻 Starting Senior Engineer Code Review Bot...")
         
         # Try to get PR number from GitHub Actions context first
         pr_number = os.getenv("GITHUB_EVENT_NUMBER") or os.getenv("GITHUB_PR_NUMBER")
@@ -355,13 +449,13 @@ if __name__ == "__main__":
             print(f"📋 Using PR number from GitHub Actions context: {pr_number}")
         
         diffs = get_diff(pr_number)
-        print(f"📁 Analyzing {len(diffs)} files...")
+        print(f"📁 Reviewing {len(diffs)} files...")
         
         review_comments = review_code(diffs)
         
         if review_comments:
             post_review(pr_number, review_comments)
-            print(f"🎉 Security review completed for PR #{pr_number}")
+            print(f"🎉 Code review completed for PR #{pr_number}")
         else:
             print("ℹ️ No files to review")
             
