@@ -454,6 +454,20 @@ if __name__ == "__main__":
         if review_comments:
             post_review(pr_number, review_comments)
             print(f"🎉 Code review completed for PR #{pr_number}")
+            
+            # Check for critical issues that should block merge
+            critical_issues_found = False
+            for comment in review_comments:
+                if "🚨 CRITICAL ISSUES" in comment:
+                    critical_issues_found = True
+                    break
+            
+            if critical_issues_found:
+                print("🚫 BLOCKING MERGE: Critical security/quality issues found!")
+                print("💡 Fix the critical issues before merging this PR.")
+                exit(1)  # This will fail the GitHub Actions workflow and block merge
+            else:
+                print("✅ No critical issues found - merge is safe!")
         else:
             print("ℹ️ No files to review")
             
