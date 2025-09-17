@@ -1,0 +1,8 @@
+# CodeReviewer.AI Bot - Default Reviewer for All Files
+# This ensures the CodeReviewer.AI bot reviews all changes
+
+* @suhasramanand
+
+# The bot will automatically review all pull requests
+# and provide line-specific feedback on code quality,
+# security vulnerabilities, performance issues, and best practices.
