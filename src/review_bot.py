@@ -241,13 +241,42 @@ def review_code(file_diffs):
     return comments
 
 def post_review(pr_number, comments):
-    """Post security-focused comments back to the pull request."""
+    """Post security-focused review that can approve/reject the PR."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    url = f"https://api.github.com/repos/suhasramanand/CodeReviewer.AI/issues/{pr_number}/comments"
+    repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
     
+    # Check if there are any critical security issues
+    has_critical_issues = any("🚨" in comment or "CRITICAL" in comment.upper() for comment in comments)
+    
+    # Create a proper GitHub review
+    review_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
+    
+    if has_critical_issues:
+        review_event = "REQUEST_CHANGES"
+        review_body = "🚨 **SECURITY REVIEW FAILED** - Critical security issues found!\n\n"
+    else:
+        review_event = "APPROVE"
+        review_body = "✅ **SECURITY REVIEW PASSED** - No critical security issues found!\n\n"
+    
+    # Add all comments to the review body
+    for comment in comments:
+        review_body += f"{comment}\n\n"
+    
+    # Create the review
+    payload = {
+        "body": review_body,
+        "event": review_event
+    }
+    
+    response = requests.post(review_url, headers=headers, json=payload)
+    response.raise_for_status()
+    print(f"✅ Posted {review_event} review")
+    
+    # Also post individual comments for visibility
+    comment_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
     for comment in comments:
         payload = {"body": comment}
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(comment_url, headers=headers, json=payload)
         response.raise_for_status()
         print(f"✅ Posted security review comment")
 
