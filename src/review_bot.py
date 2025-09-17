@@ -53,12 +53,27 @@ SECURITY_PATTERNS = {
 
 def get_latest_pr():
     """Fetch the latest pull request number from the repository."""
-    headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
+    headers = {
+        "Authorization": f"Bearer {GIT_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "CodeReviewer.AI-Bot"
+    }
     # Use GITHUB_REPOSITORY environment variable if available, otherwise fallback to hardcoded value
     repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
     url = f"https://api.github.com/repos/{repo}/pulls?state=open"
     print(f"🔍 Checking for open PRs in {repo}...")
+    print(f"🔑 Using token: {GIT_TOKEN[:10]}..." if GIT_TOKEN else "❌ No token provided")
+    
     response = requests.get(url, headers=headers)
+    print(f"📡 Response status: {response.status_code}")
+    
+    if response.status_code == 401:
+        print("❌ Authentication failed. Please check:")
+        print("   1. GIT_TOKEN secret is set correctly")
+        print("   2. Token has 'repo' permissions")
+        print("   3. Token is not expired")
+        response.raise_for_status()
+    
     response.raise_for_status()
 
     prs = response.json()
@@ -260,7 +275,14 @@ def post_review(pr_number, comments):
 if __name__ == "__main__":
     try:
         print("🛡️ Starting Security Code Review Bot...")
-        pr_number = get_latest_pr()
+        
+        # Try to get PR number from GitHub Actions context first
+        pr_number = os.getenv("GITHUB_EVENT_NUMBER") or os.getenv("GITHUB_PR_NUMBER")
+        if not pr_number:
+            print("🔍 No GitHub context found, trying to fetch latest PR...")
+            pr_number = get_latest_pr()
+        else:
+            print(f"📋 Using PR number from GitHub Actions context: {pr_number}")
         
         diffs = get_diff(pr_number)
         print(f"📁 Analyzing {len(diffs)} files...")
