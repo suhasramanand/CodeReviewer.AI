@@ -371,9 +371,75 @@ def generate_human_review(file_name: str, patch: str, issues: List[Dict], cve_vu
     
     return f"{overall_status}\n\n{checklist_text}{issue_details}"
 
+def generate_line_comment(issue):
+    """Generate a concise line-specific comment for an issue."""
+    category = issue['category']
+    issue_type = issue['type'].replace('_', ' ').title()
+    severity = issue['severity']
+    
+    # Generate specific suggestions based on issue type
+    suggestions = {
+        'sql_injection': "Use parameterized queries: `cursor.execute(query, params)`",
+        'command_injection': "Avoid shell=True, use subprocess.run with list args",
+        'unsafe_deserialization': "Use safe deserialization or validate input first",
+        'hardcoded_secrets': "Move secrets to environment variables or config files",
+        'path_traversal': "Validate and sanitize file paths before use",
+        'xss': "Escape user input or use safe templating",
+        'long_functions': "Break this function into smaller, focused functions",
+        'magic_numbers': "Define constants with descriptive names",
+        'todo_comments': "Address TODO items before merging",
+        'print_statements': "Use proper logging instead of print statements",
+        'empty_catches': "Handle exceptions properly or log them",
+        'duplicate_code': "Extract common code into reusable functions",
+        'n_plus_one': "Use bulk queries or joins to avoid N+1 problem",
+        'inefficient_loops': "Consider using list comprehensions or vectorized operations",
+        'memory_leaks': "Avoid global variables, use proper resource management",
+        'missing_error_handling': "Add try-catch blocks for error handling",
+        'hardcoded_values': "Use configuration files or environment variables",
+        'missing_validation': "Validate input parameters before processing"
+    }
+    
+    suggestion = suggestions.get(issue['type'], "Review this code for potential improvements")
+    
+    # Create severity emoji
+    severity_emoji = {
+        'HIGH': '🚨',
+        'MEDIUM': '⚠️', 
+        'LOW': '💡'
+    }
+    
+    emoji = severity_emoji.get(severity, '💡')
+    
+    return f"{emoji} **{issue_type}** ({severity})\n\n{suggestion}"
+
+def generate_summary_comment(file_name, issues, cve_vulnerabilities):
+    """Generate a summary comment for the file."""
+    if not issues and not cve_vulnerabilities:
+        return f"✅ **{file_name}** - All checks passed!"
+    
+    critical_count = len([i for i in issues if i['severity'] == 'HIGH'])
+    medium_count = len([i for i in issues if i['severity'] == 'MEDIUM'])
+    low_count = len([i for i in issues if i['severity'] == 'LOW'])
+    
+    if critical_count > 0:
+        status = f"🚨 **{file_name}** - {critical_count} critical issues found"
+    elif medium_count > 0:
+        status = f"⚠️ **{file_name}** - {medium_count} issues found"
+    else:
+        status = f"💡 **{file_name}** - {low_count} suggestions"
+    
+    if cve_vulnerabilities:
+        status += f" + {len(cve_vulnerabilities)} CVEs"
+    
+    return status
+
 def review_code(file_diffs):
     """Analyze code changes with comprehensive engineering review."""
-    comments = []
+    review_data = {
+        'line_comments': [],
+        'summary_comment': '',
+        'critical_issues_found': False
+    }
     
     for file in file_diffs:
         file_name = file["filename"]
@@ -384,13 +450,31 @@ def review_code(file_diffs):
             
         print(f"🔍 Reviewing {file_name}...")
         
-        # Extract added code for analysis
-        added_lines = []
-        for line in patch.split('\n'):
-            if line.startswith('+') and not line.startswith('+++'):
-                added_lines.append(line[1:])
+        # Parse patch to get line numbers and content
+        file_lines = patch.split('\n')
+        line_mapping = {}  # Maps line number in diff to actual line number
+        current_line = 0
         
-        added_code = '\n'.join(added_lines)
+        for line in file_lines:
+            if line.startswith('@@'):
+                # Parse hunk header: @@ -start,count +start,count @@
+                parts = line.split()
+                if len(parts) >= 3:
+                    old_range = parts[1].split(',')
+                    new_range = parts[2].split(',')
+                    current_line = int(new_range[0][1:])  # Remove '+' prefix
+            elif line.startswith('+') and not line.startswith('+++'):
+                line_mapping[current_line] = line[1:]  # Store added line content
+                current_line += 1
+            elif line.startswith('-'):
+                # Skip deleted lines
+                pass
+            elif line.startswith(' '):
+                # Context line
+                current_line += 1
+        
+        # Extract added code for analysis
+        added_code = '\n'.join(line_mapping.values())
         
         # Comprehensive code analysis
         issues = scan_for_code_issues(added_code, file_name)
@@ -402,37 +486,70 @@ def review_code(file_diffs):
             if dependencies:
                 cve_vulnerabilities = check_cve_vulnerabilities(dependencies)
         
-        # Generate human-like review
-        review = generate_human_review(file_name, patch, issues, cve_vulnerabilities)
-        
-        # Format comment with status badge
-        if not issues and not cve_vulnerabilities:
-            status = "✅ ALL CHECKS PASSED"
-        elif any(i['severity'] == 'HIGH' for i in issues):
-            status = "🚨 CRITICAL ISSUES"
-        elif any(i['severity'] == 'MEDIUM' for i in issues):
-            status = "⚠️ ISSUES FOUND"
-        else:
-            status = "💡 SUGGESTIONS"
+        # Create line-specific comments for each issue
+        for issue in issues:
+            if issue['severity'] == 'HIGH':
+                review_data['critical_issues_found'] = True
             
-        comment = f"## {status} - {file_name}\n\n{review}"
+            # Find the actual line number in the diff
+            issue_line = issue['line']
+            if issue_line in line_mapping:
+                line_comment = {
+                    'path': file_name,
+                    'line': issue_line,
+                    'body': generate_line_comment(issue),
+                    'side': 'RIGHT'  # Comment on the new version
+                }
+                review_data['line_comments'].append(line_comment)
         
-        comments.append(comment)
+        # Generate summary comment
+        if issues or cve_vulnerabilities:
+            summary = generate_summary_comment(file_name, issues, cve_vulnerabilities)
+            review_data['summary_comment'] = summary
     
-    return comments
+    return review_data
 
-def post_review(pr_number, comments):
-    """Post security-focused comments back to the pull request."""
+def post_review(pr_number, review_data):
+    """Post line-specific review comments and summary."""
     headers = {"Authorization": f"Bearer {GIT_TOKEN}"}
-    # Use GITHUB_REPOSITORY environment variable if available, otherwise fallback to hardcoded value
     repo = GITHUB_REPOSITORY or "suhasramanand/CodeReviewer.AI"
-    url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
     
-    for comment in comments:
-        payload = {"body": comment}
+    # Post line-specific comments
+    if review_data['line_comments']:
+        url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
+        
+        # Group comments by file
+        comments_by_file = {}
+        for comment in review_data['line_comments']:
+            file_path = comment['path']
+            if file_path not in comments_by_file:
+                comments_by_file[file_path] = []
+            comments_by_file[file_path].append({
+                'path': comment['path'],
+                'line': comment['line'],
+                'body': comment['body'],
+                'side': comment['side']
+            })
+        
+        # Create review for each file
+        for file_path, comments in comments_by_file.items():
+            payload = {
+                'body': f"## Code Review - {file_path}\n\nFound {len(comments)} issues that need attention:",
+                'event': 'REQUEST_CHANGES' if review_data['critical_issues_found'] else 'COMMENT',
+                'comments': comments
+            }
+            
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            print(f"✅ Posted line-specific review for {file_path}")
+    
+    # Post summary comment
+    if review_data['summary_comment']:
+        url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
+        payload = {"body": review_data['summary_comment']}
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
-        print(f"✅ Posted security review comment")
+        print(f"✅ Posted summary comment")
 
 if __name__ == "__main__":
     try:
@@ -449,20 +566,14 @@ if __name__ == "__main__":
         diffs = get_diff(pr_number)
         print(f"📁 Reviewing {len(diffs)} files...")
         
-        review_comments = review_code(diffs)
+        review_data = review_code(diffs)
         
-        if review_comments:
-            post_review(pr_number, review_comments)
+        if review_data['line_comments'] or review_data['summary_comment']:
+            post_review(pr_number, review_data)
             print(f"🎉 Code review completed for PR #{pr_number}")
             
             # Check for critical issues that should block merge
-            critical_issues_found = False
-            for comment in review_comments:
-                if "🚨 CRITICAL ISSUES" in comment:
-                    critical_issues_found = True
-                    break
-            
-            if critical_issues_found:
+            if review_data['critical_issues_found']:
                 print("🚫 BLOCKING MERGE: Critical security/quality issues found!")
                 print("💡 Fix the critical issues before merging this PR.")
                 exit(1)  # This will fail the GitHub Actions workflow and block merge
